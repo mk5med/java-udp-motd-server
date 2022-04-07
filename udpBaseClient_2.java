@@ -15,14 +15,33 @@ public class udpBaseClient_2 {
         InetAddress serverIP = InetAddress.getLocalHost();
         MOTDPacket motdPacket = new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_SYN);
         DatagramPacket outPacket = MOTDProtocol.createMOTDDatagram(motdPacket, serverIP, SERVER_PORT);
-
+		
         // Send SYN and expect SYNACK
         MOTDProtocol.connectionSend(socket, outPacket, MOTDProtocolFlags.FLAG_TYPE_SYNACK);
 
         // Send REQUEST
         motdPacket.setType(MOTDProtocolFlags.FLAG_TYPE_REQUEST);
         socket.send(MOTDProtocol.createMOTDDatagram(motdPacket, serverIP, SERVER_PORT));
-
+		byte[] receive = new byte[65535];
+		DatagramPacket DpReceive = null;
         // Load data and check for errors
+		while(true){
+			DpReceive = new DatagramPacket(receive, receive.length);
+			socket.receive(DpReceive);
+			System.out.println(data(receive));
     }
+	}
+	public static StringBuilder data(byte[] a)
+		{
+		if (a == null)
+			return null;
+		StringBuilder ret = new StringBuilder();
+		int i = 0;
+		while (a[i] != 0)
+		{
+			ret.append((char) a[i]);
+			i++;
+		}
+		return ret;
+		}
 }

@@ -1,14 +1,31 @@
 import java.net.*;
-
+import java.util.Timer;
+import java.util.*;
 import java.io.*;
 
 public class MOTDServer {
+  public String message = "MOTD Not Ready.";
+
   private final static int SERVER_PORT = 5000;
-  public String message;
   DatagramSocket socket;
+  private int updateCount = 0;
+
+  private Timer messageChangeTimer = new Timer();
+  private long messageChangeDelay = 0L; // Wait 0 seconds before starting the timer
+  private long messageChangePeriod = 5000L; // Update every 5 seconds
+
+  private TimerTask messageChangeTask = new TimerTask() {
+    public void run() {
+      updateCount++;
+      message = "Good day. It has been " + messageChangePeriod * updateCount + "s since the server started.";
+    }
+  };
 
   public MOTDServer() throws SocketException {
     this.socket = new DatagramSocket(SERVER_PORT);
+
+    // Start the timer
+    messageChangeTimer.scheduleAtFixedRate(messageChangeTask, messageChangeDelay, messageChangePeriod);
   }
 
   public void start() throws IOException, Exception {
@@ -24,7 +41,7 @@ public class MOTDServer {
         System.out.println("MOTDServer: Ready to connect.");
         MOTDProtocol.establishHandshake(socket, session);
 
-        sendMOTD("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", session);
+        sendMOTD(message, session);
       } catch (IOException | RuntimeException e) {
         e.printStackTrace();
 
@@ -44,7 +61,7 @@ public class MOTDServer {
 
       MOTDPacket outPacket = new MOTDPacket(data.getBytes());
       outPacket.setSequence(sequence);
-      
+
       // Send data
       DatagramPacket sndPacket = MOTDProtocol.createMOTDDatagram(outPacket, session.dAddress, session.dPort);
       MOTDPacket inPacket = MOTDProtocol.connectionSend(socket, sndPacket);
