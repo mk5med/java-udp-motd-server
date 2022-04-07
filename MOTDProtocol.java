@@ -2,34 +2,93 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 
 public class MOTDProtocol {
-  public static boolean establishHandshake(DatagramSocket socket, Helpers.Session session) throws IOException {
-    System.out.println("Starting handshake");
+  public static void establishHandshake(DatagramSocket socket, Helpers.Session session) throws IOException, RuntimeException {
+    System.out.println("Handshake: Waiting");
     MOTDPacket packet;
-    // Read a SYN MOTDPacket packet
+
+    socket.setSoTimeout(0); // Wait indefinitely for a connection
+
+    // READ a SYN MOTDPacket packet
+    // This will block until data is read
     packet = createMOTDFromSocket(socket);
+
     // Save the inbound connection information
-    session = new Helpers.Session(packet.address, packet.port);
+    session.dAddress = packet.address;
+    session.dPort = packet.port;
 
-    if (packet.getType() != MOTDPacket.MOTDProtocolFlags.FLAG_TYPE_SYN) {
-      // Handle retransmission and closing the connection
+    if (packet.getType() != MOTDProtocolFlags.FLAG_TYPE_SYN) {
+      System.out.println("Handshake: Failed");
+      throw new RuntimeException("Handshake: Failed. Expected SYN type");
     }
 
-    // Send a SYNACK MOTDPacket packet
-    packet = new MOTDPacket(MOTDPacket.MOTDProtocolFlags.FLAG_TYPE_SYNACK);
-    socket.send(MOTDProtocol.createMOTDDatagram(packet, session.dAddress, session.dPort));
+    // SEND a SYNACK MOTDPacket packet. This is grouped with READ
+    DatagramPacket datagramPacket = MOTDProtocol.createMOTDDatagram(new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_SYNACK), session.dAddress, session.dPort);
 
-    // Read a REQUEST MOTDPacket packet
-    packet = MOTDProtocol.createMOTDFromSocket(socket);
-    if (packet.getType() != MOTDPacket.MOTDProtocolFlags.FLAG_TYPE_REQUEST) {
-      // Handle retransmission and closing the connection
-    }
+    // READ a REQUEST MOTDPacket packet
+    // This will throw an error if it fails to send the SYNACK or detect a REQUEST packet
+    MOTDProtocol.connectionSend(socket, datagramPacket, MOTDProtocolFlags.FLAG_TYPE_REQUEST);
 
-    System.out.println("Handshake complete");
     // A connection is established and the data is ready to send
-    // Return true if everything passed
-    return true;
+    System.out.println("Handshake: Complete");
+  }
+
+  /**
+   * Send a datagram over a socket and wait for an ACK response
+   * @param socket
+   * @param sndPacket
+   * @return
+   * @throws IOException
+   */
+  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket)
+  throws IOException {
+    return connectionSend(socket, sndPacket, MOTDProtocolFlags.FLAG_TYPE_ACK, 5000, 3);
+  }
+
+  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType)
+  throws IOException {
+    return connectionSend(socket, sndPacket, expectType, 5000, 3);
+  }
+
+  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType, int timeout, int tries)
+      throws IOException {
+
+    int initialTimeout = socket.getSoTimeout();
+    socket.setSoTimeout(timeout);
+
+    // Send the packet
+    socket.send(sndPacket);
+
+    int try_count = 0;
+    MOTDPacket rcvPacket = null;
+
+    while (try_count < tries) {
+      try {
+        rcvPacket = MOTDProtocol.createMOTDFromSocket(socket);
+        if ((rcvPacket.getType() & expectType) != expectType) {
+          throw new RuntimeException("NOT EXPECTED TYPE");
+        }
+
+        break;
+      } catch (SocketTimeoutException | RuntimeException exception) {
+        // This triggers if the connection timed out or if the packet type is not expected
+        try_count++;
+        rcvPacket = null;
+
+        // If the try_count reaches a threshold, stop retransmitting and report an error
+        if (try_count == tries)
+          throw exception;
+
+        System.out.println("Packet failed. retransmitting.");
+        socket.send(sndPacket);
+      }
+    }
+
+    // Reset the socket timeout
+    socket.setSoTimeout(initialTimeout);
+    return rcvPacket;
   }
 
   /**

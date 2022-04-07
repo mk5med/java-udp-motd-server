@@ -48,11 +48,4 @@ public class MOTDPacket {
     if(data[0] == MOTDProtocolFlags.FLAG_TYPE_DATA) packet.setData(data);
     return packet;
   }
-
-  public final static class MOTDProtocolFlags {
-    public static byte FLAG_TYPE_SYN = 0x00;
-    public static byte FLAG_TYPE_SYNACK = 0x01;
-    public static byte FLAG_TYPE_REQUEST = 0x02;
-    public static byte FLAG_TYPE_DATA = 0x03;
-  }
 }

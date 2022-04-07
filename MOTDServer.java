@@ -15,18 +15,22 @@ public class MOTDServer {
     loop();
   }
 
-  private void loop() throws Exception {
-    // A session object to store the incoming session information
-    Helpers.Session session = null;
+  private void loop() {
+    while (true) {
+      // A session object to store the incoming session information
+      Helpers.Session session = new Helpers.Session(null, 0);
 
-    boolean connectionEstablished = MOTDProtocol.establishHandshake(socket, session);
-    
-    if (!connectionEstablished) {
-      // Temporary error handling
-      throw new Exception("failed to establish a connection");
+      try {
+        System.out.println("MOTDServer: Ready to connect.");
+        MOTDProtocol.establishHandshake(socket, session);
+
+        sendMOTD("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", session);
+      } catch (IOException | RuntimeException e) {
+        e.printStackTrace();
+
+        System.out.println("MOTDServer: Recovering from error.");
+      }
     }
-
-    sendMOTD("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", session);
   }
 
   private void sendMOTD(String message, Helpers.Session session) throws IOException {
@@ -34,14 +38,13 @@ public class MOTDServer {
     byte sequence = 0;
     for (int offset = 0; offset < message.length(); offset += 16) {
       String data = message.substring(offset);
+
+      MOTDPacket outPacket = new MOTDPacket(data.getBytes());
+      outPacket.setSequence(sequence);
       
-      MOTDPacket motdPacket = new MOTDPacket(data.getBytes());
-      motdPacket.setSequence(sequence);
-
       // Send data
-      socket.send(MOTDProtocol.createMOTDDatagram(motdPacket, session.dAddress, session.dPort));
-
-      // Wait for ACK. This could result in a timeout
+      DatagramPacket sndPacket = MOTDProtocol.createMOTDDatagram(outPacket, session.dAddress, session.dPort);
+      MOTDPacket inPacket = MOTDProtocol.connectionSend(socket, sndPacket);
 
       // Make sure the ACK has a valid sequence number
 
@@ -51,7 +54,6 @@ public class MOTDServer {
   }
 
   public static void main(String[] args) throws IOException, SocketException {
-    System.out.println("READY TO CONNECT");
     MOTDServer server = new MOTDServer();
     try {
       server.start();
