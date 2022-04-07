@@ -34,7 +34,7 @@ public class MOTDServer {
   }
 
   private void sendMOTD(String message, Helpers.Session session) throws IOException {
-
+    System.out.println("MOTDServer: Starting to send MOTD.");
     byte sequence = 0;
     for (int offset = 0; offset < message.length(); offset += 16) {
       String data = message.substring(offset);

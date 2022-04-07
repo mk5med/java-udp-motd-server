@@ -5,7 +5,8 @@ import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 
 public class MOTDProtocol {
-  public static void establishHandshake(DatagramSocket socket, Helpers.Session session) throws IOException, RuntimeException {
+  public static void establishHandshake(DatagramSocket socket, Helpers.Session session)
+      throws IOException, RuntimeException {
     System.out.println("Handshake: Waiting");
     MOTDPacket packet;
 
@@ -25,10 +26,12 @@ public class MOTDProtocol {
     }
 
     // SEND a SYNACK MOTDPacket packet. This is grouped with READ
-    DatagramPacket datagramPacket = MOTDProtocol.createMOTDDatagram(new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_SYNACK), session.dAddress, session.dPort);
+    DatagramPacket datagramPacket = MOTDProtocol.createMOTDDatagram(new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_SYNACK),
+        session.dAddress, session.dPort);
 
     // READ a REQUEST MOTDPacket packet
-    // This will throw an error if it fails to send the SYNACK or detect a REQUEST packet
+    // This will throw an error if it fails to send the SYNACK or detect a REQUEST
+    // packet
     MOTDProtocol.connectionSend(socket, datagramPacket, MOTDProtocolFlags.FLAG_TYPE_REQUEST);
 
     // A connection is established and the data is ready to send
@@ -37,22 +40,24 @@ public class MOTDProtocol {
 
   /**
    * Send a datagram over a socket and wait for an ACK response
+   * 
    * @param socket
    * @param sndPacket
    * @return
    * @throws IOException
    */
   public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket)
-  throws IOException {
-    return connectionSend(socket, sndPacket, MOTDProtocolFlags.FLAG_TYPE_ACK, 5000, 3);
+      throws IOException {
+    return connectionSend(socket, sndPacket, MOTDProtocolFlags.FLAG_TYPE_ACK);
   }
 
   public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType)
-  throws IOException {
+      throws IOException {
     return connectionSend(socket, sndPacket, expectType, 5000, 3);
   }
 
-  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType, int timeout, int tries)
+  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType, int timeout,
+      int tries)
       throws IOException {
 
     int initialTimeout = socket.getSoTimeout();
@@ -65,17 +70,30 @@ public class MOTDProtocol {
     MOTDPacket rcvPacket = null;
 
     while (try_count < tries) {
+
       try {
         rcvPacket = MOTDProtocol.createMOTDFromSocket(socket);
+
+        boolean addressDifference = !rcvPacket.address.getHostAddress().equals(sndPacket.getAddress().getHostAddress());
+        boolean portDifference = rcvPacket.port != sndPacket.getPort();
+
+        // If the incoming message is not from the expected address, discard it
+        if (addressDifference || portDifference) {
+          throw new RuntimeException("Not expected address.");
+        }
+
         if ((rcvPacket.getType() & expectType) != expectType) {
-          throw new RuntimeException("NOT EXPECTED TYPE");
+          try_count++;
+          throw new RuntimeException(
+              "Not expected type. Expected: " + expectType + " got: " + (rcvPacket.getType() & expectType));
         }
 
         break;
       } catch (SocketTimeoutException | RuntimeException exception) {
-        // This triggers if the connection timed out or if the packet type is not expected
-        try_count++;
         rcvPacket = null;
+        if (exception.getClass() == SocketTimeoutException.class) try_count++;
+        // This triggers if the connection timed out or if the packet type is not
+        // expected
 
         // If the try_count reaches a threshold, stop retransmitting and report an error
         if (try_count == tries)
