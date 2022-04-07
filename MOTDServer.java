@@ -48,7 +48,7 @@ public class MOTDServer {
 
       // Make sure the ACK has a valid sequence number
 
-      // Clear the buffer after every message.
+      // Generate the next sequence number
       sequence = MOTDProtocol.nextSequenceValue(sequence);
     }
   }
