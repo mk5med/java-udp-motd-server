@@ -51,6 +51,12 @@ public class MOTDServer {
       // Generate the next sequence number
       sequence = MOTDProtocol.nextSequenceValue(sequence);
     }
+
+    MOTDPacket packet = new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_FIN);
+    DatagramPacket sndPacket = MOTDProtocol.createMOTDDatagram(packet, session.dAddress, session.dPort);
+    
+    // Send a FIN and wait for an ACK
+    MOTDProtocol.connectionSend(socket, sndPacket);
   }
 
   public static void main(String[] args) throws IOException, SocketException {

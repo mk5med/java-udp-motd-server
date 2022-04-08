@@ -1,12 +1,5 @@
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
-
-/**
- * 0-4: type
- * 4-20: data
- * 
- */
 
 public class MOTDPacket {
 
