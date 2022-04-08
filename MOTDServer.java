@@ -36,8 +36,11 @@ public class MOTDServer {
   private void sendMOTD(String message, Helpers.Session session) throws IOException {
     System.out.println("MOTDServer: Starting to send MOTD.");
     byte sequence = 0;
+
     for (int offset = 0; offset < message.length(); offset += 16) {
-      String data = message.substring(offset);
+      // If offset + 16 is larger than the message length, then there are less than 16 characters in the next substring
+      // This clause is used to fetch the remainder of the string without raising an IndexOutOfBounds error
+      String data = (offset + 16) > message.length() ? message.substring(offset) : message.substring(offset, 16);
 
       MOTDPacket outPacket = new MOTDPacket(data.getBytes());
       outPacket.setSequence(sequence);

@@ -56,9 +56,10 @@ public class MOTDProtocol {
     return connectionSend(socket, sndPacket, expectType, 5000, 3);
   }
 
-  public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType, int timeout,
-      int tries)
-      throws IOException {
+  public static MOTDPacket connectionSend(
+      DatagramSocket socket, DatagramPacket sndPacket,
+      byte expectType, int timeout, int tries
+    ) throws IOException {
 
     int initialTimeout = socket.getSoTimeout();
     socket.setSoTimeout(timeout);
@@ -70,7 +71,6 @@ public class MOTDProtocol {
     MOTDPacket rcvPacket = null;
 
     while (try_count < tries) {
-
       try {
         rcvPacket = MOTDProtocol.createMOTDFromSocket(socket);
 
