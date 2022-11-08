@@ -4,6 +4,7 @@ import java.util.*;
 import java.io.*;
 
 public class MOTDServer {
+  private final boolean DEBUG = false;
   public String message = "MOTD Not Ready.";
 
   private final static int SERVER_PORT = 5000;
@@ -12,7 +13,7 @@ public class MOTDServer {
 
   private Timer messageChangeTimer = new Timer();
   private long messageChangeDelay = 0L; // Wait 0 seconds before starting the timer
-  private long messageChangePeriod = 5000L; // Update every 5 seconds
+  private long messageChangePeriod = DEBUG ? 5000L : 1000 * 60 * 60 * 24; // Update every 5 seconds when in debug mode
 
   private TimerTask messageChangeTask = new TimerTask() {
     public void run() {
@@ -52,29 +53,56 @@ public class MOTDServer {
 
   private void sendMOTD(String message, Helpers.Session session) throws IOException {
     System.out.println("MOTDServer: Starting to send MOTD.");
-    byte sequence = 0;
+    byte currentSequence = 0;
 
     for (int offset = 0; offset < message.length(); offset += 16) {
-      // If offset + 16 is larger than the message length, then there are less than 16 characters in the next substring
-      // This clause is used to fetch the remainder of the string without raising an IndexOutOfBounds error
-      String data = (offset + 16) > message.length() ? message.substring(offset) : message.substring(offset, 16);
+      // If offset + 16 is larger than the message length, then there are less than 16
+      // characters in the next substring
+      // This clause is used to fetch the remainder of the string without raising an
+      // IndexOutOfBounds error
+      String data = (offset + 16) > message.length() ? message.substring(offset)
+          : message.substring(offset, offset + 16);
 
       MOTDPacket outPacket = new MOTDPacket(data.getBytes());
-      outPacket.setSequence(sequence);
+      outPacket.setSequence(currentSequence);
 
       // Send data
       DatagramPacket sndPacket = MOTDProtocol.createMOTDDatagram(outPacket, session.dAddress, session.dPort);
-      MOTDPacket inPacket = MOTDProtocol.connectionSend(socket, sndPacket);
+      MOTDPacket inPacket = null;
+      try {
+        inPacket = MOTDProtocol.connectionSend(socket, sndPacket);
+      } catch (RuntimeException exception) {
+        int _time = socket.getSoTimeout();
+        socket.setSoTimeout(5000);
+        socket.send(sndPacket);
+        inPacket = MOTDProtocol.createMOTDFromSocket(socket);
+        socket.setSoTimeout(_time);
 
-      // Make sure the ACK has a valid sequence number
+        if (inPacket.getType() == MOTDProtocolFlags.FLAG_TYPE_REQUEST) {
+          // Restart from the beginning
+          offset = 0;
+          continue;
+        } else if (inPacket.getType() == MOTDProtocolFlags.FLAG_TYPE_ACK) {
+          if (inPacket.getSequence() != currentSequence) {
+            // This is safe because at this point the offset is a multiple of 16
+            offset -= 16;
+            continue;
+          }
+
+          exception.printStackTrace();
+        }
+
+        // Otherwise stop the loop
+        break;
+      }
 
       // Generate the next sequence number
-      sequence = MOTDProtocol.nextSequenceValue(sequence);
+      currentSequence = MOTDProtocol.nextSequenceValue(currentSequence);
     }
 
     MOTDPacket packet = new MOTDPacket(MOTDProtocolFlags.FLAG_TYPE_FIN);
     DatagramPacket sndPacket = MOTDProtocol.createMOTDDatagram(packet, session.dAddress, session.dPort);
-    
+
     // Send a FIN and wait for an ACK
     MOTDProtocol.connectionSend(socket, sndPacket);
   }

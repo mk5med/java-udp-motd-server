@@ -17,16 +17,31 @@ public class MOTDPacket {
     this.setData(data);
   }
 
-  public void setData(byte[] data) { 
-    for(int i = 2; i < 18; i++) {
-      if (i-1 >= data.length) break;
-      this.data[i] = data[i-2];
+  public void setData(byte[] newData) { 
+    
+    for(int i = 2; i < this.data.length; i++) {
+      if (i-2 >= newData.length) {
+        // Fill the remainder of the data with 0
+        this.data[i] = 0;
+        continue;
+      }
+
+      this.data[i] = newData[i-2];
     }
   }
-  public byte[] getData() { return this.data; }
-
+  public void setBytes(byte[] bytes) { this.data = bytes; }
+  public byte[] getBytes() { return this.data; }
+  
+  public byte[] getData() {
+    byte[] innerData = new byte[16];
+    for(int i = 2; i < data.length; i++) {
+      innerData[i-2] = data[i];
+    }
+    
+    return innerData;
+  }
   public void setSequence(byte value) { this.data[1] = value;}
-  public int getSequence() { return this.data[1]; }
+  public byte getSequence() { return this.data[1]; }
 
   public void setType(byte type) { this.data[0] = type;}
   public int getType() { return this.data[0]; }
@@ -38,7 +53,7 @@ public class MOTDPacket {
     packet.address = datagramPacket.getAddress();
     packet.port = datagramPacket.getPort();
 
-    if(data[0] == MOTDProtocolFlags.FLAG_TYPE_DATA) packet.setData(data);
+    if(data[0] == MOTDProtocolFlags.FLAG_TYPE_DATA) packet.setBytes(data);
     return packet;
   }
 }

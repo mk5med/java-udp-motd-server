@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 
 public class MOTDProtocol {
@@ -47,19 +48,19 @@ public class MOTDProtocol {
    * @throws IOException
    */
   public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket)
-      throws IOException {
+      throws SocketTimeoutException, RuntimeException, SocketException, IOException {
     return connectionSend(socket, sndPacket, MOTDProtocolFlags.FLAG_TYPE_ACK);
   }
 
   public static MOTDPacket connectionSend(DatagramSocket socket, DatagramPacket sndPacket, byte expectType)
-      throws IOException {
+      throws SocketTimeoutException, RuntimeException, SocketException, IOException {
     return connectionSend(socket, sndPacket, expectType, 5000, 3);
   }
 
   public static MOTDPacket connectionSend(
       DatagramSocket socket, DatagramPacket sndPacket,
-      byte expectType, int timeout, int tries
-    ) throws IOException {
+      byte expectType, int timeout, int tries)
+      throws SocketTimeoutException, RuntimeException, SocketException, IOException {
 
     int initialTimeout = socket.getSoTimeout();
     socket.setSoTimeout(timeout);
@@ -85,13 +86,11 @@ public class MOTDProtocol {
         if ((rcvPacket.getType() & expectType) != expectType) {
           try_count++;
           throw new RuntimeException(
-              "Not expected type. Expected: " + expectType + " got: " + (rcvPacket.getType() & expectType));
+              "Not expected type. Expected: " + expectType + " got: " + (rcvPacket.getType()));
         }
 
         break;
       } catch (SocketTimeoutException | RuntimeException exception) {
-        rcvPacket = null;
-        if (exception.getClass() == SocketTimeoutException.class) try_count++;
         // This triggers if the connection timed out or if the packet type is not
         // expected
 
@@ -131,7 +130,7 @@ public class MOTDProtocol {
    * @return
    */
   public static DatagramPacket createMOTDDatagram(MOTDPacket motdPacket, InetAddress address, int port) {
-    byte[] buf = motdPacket.getData();
+    byte[] buf = motdPacket.getBytes();
     return new DatagramPacket(buf, buf.length, address, port);
   }
 
